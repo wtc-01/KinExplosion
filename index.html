@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 
-<title>Kin Bomber Mobile (Fixed Collision)</title>
+<title>Kin Bomber Mobile (Stable)</title>
 
 <style>
 :root{
@@ -20,22 +20,30 @@ overflow:hidden;
 font-family:sans-serif;
 }
 
+/* WRAP */
 #wrap{
 position:absolute;
 top:50%;
 left:50%;
 transform:translate(-50%,-50%);
-will-change: transform;
 }
 
+/* GAME */
 #game{
+position:relative; /* 🔥 สำคัญ */
 display:grid;
 grid-template-columns:repeat(15,40px);
 grid-template-rows:repeat(13,40px);
 gap:2px;
 }
 
-.cell{width:40px;height:40px;background:#1e293b;}
+.cell{
+width:40px;height:40px;
+background:#1e293b;
+position:relative;
+z-index:1;
+}
+
 .wall{background:#475569;}
 .block{background:url('monst/block.png');background-size:cover;}
 
@@ -47,13 +55,13 @@ animation:blink .5s infinite;
 @keyframes blink{50%{transform:scale(1.2)}}
 
 .explosion{
-background:url('monst/explode.png');
-background-size:160px 40px;
-animation:exp .4s steps(4) forwards;
+background:orange;
 }
-@keyframes exp{to{background-position:-160px}}
 
-.heart{background:url('monst/heart.png');background-size:cover;}
+.heart{
+background:url('monst/heart.png');
+background-size:cover;
+}
 
 .enemy{
 position:absolute;
@@ -71,6 +79,7 @@ background-size:160px 40px;
 z-index:10;
 }
 
+/* HUD */
 #hud{
 position:fixed;
 top:10px;
@@ -83,6 +92,7 @@ backdrop-filter:blur(10px);
 color:white;
 }
 
+/* JOYSTICK */
 #joy{
 position:fixed;
 left:5vw;
@@ -100,6 +110,7 @@ position:absolute;
 left:25%;top:25%;
 }
 
+/* BOMB BTN */
 #bombBtn{
 position:fixed;
 right:5vw;
@@ -133,7 +144,7 @@ font-size:6vw;
 const cellSize=40, gap=2, step=cellSize+gap;
 const rows=13, cols=15;
 
-let grid=[], enemies=[];
+let grid=[], enemies=[], bombs=[];
 let player={x:1,y:1,hp:3,range:1};
 
 const game=document.getElementById("game");
@@ -141,75 +152,77 @@ const wrap=document.getElementById("wrap");
 const p=document.getElementById("player");
 const hud=document.getElementById("hud");
 
-/* 🔥 FIX สำคัญ */
-const radius = 0.35; // hitbox จริง
-const speed = 0.06;  // ลดความเร็ว
+const radius = 0.45;
+const speed = 0.05;
 
 /* SCALE */
 function scale(){
 let s=Math.min(window.innerWidth/(cols*step),window.innerHeight/(rows*step));
-s=Math.max(0.6,Math.min(s,1.2));
+s=Math.max(0.7,Math.min(s,1));
 wrap.style.transform=`translate(-50%,-50%) scale(${s})`;
 }
 window.addEventListener("resize",scale);
 
 /* MAP */
 function createMap(){
-  grid=[];
+grid=[];
+game.querySelectorAll(".cell").forEach(c=>c.remove());
 
-  // 🔥 ลบเฉพาะ cell (ไม่ลบ player)
-  game.querySelectorAll(".cell").forEach(c=>c.remove());
+for(let y=0;y<rows;y++){
+let r=[];
+for(let x=0;x<cols;x++){
+let c=document.createElement("div");
+c.className="cell";
 
-  for(let y=0;y<rows;y++){
-    let r=[];
-    for(let x=0;x<cols;x++){
-      let c=document.createElement("div");
-      c.className="cell";
+if(y===0||x===0||y===rows-1||x===cols-1||(x%2==0&&y%2==0)){
+r.push("wall");c.classList.add("wall");
+}else if(Math.random()<0.3){
+r.push("block");c.classList.add("block");
+}else r.push("empty");
 
-      if(y===0||x===0||y===rows-1||x===cols-1||(x%2==0&&y%2==0)){
-        r.push("wall"); c.classList.add("wall");
-      } else if(Math.random()<0.3){
-        r.push("block"); c.classList.add("block");
-      } else {
-        r.push("empty");
-      }
-
-      game.appendChild(c);
-    }
-    grid.push(r);
-  }
-
-  // 🔥 ย้าย player ไปอยู่บนสุดเสมอ
-  game.appendChild(p);
+game.appendChild(c);
 }
+grid.push(r);
+}
+game.appendChild(p);
+}
+
+/* DRAW */
+function draw(){
+document.querySelectorAll(".cell").forEach((c,i)=>{
+let x=i%cols,y=Math.floor(i/cols);
+let g=grid[y][x];
+c.className="cell";
+
+if(g==="wall")c.classList.add("wall");
+if(g==="block")c.classList.add("block");
+if(g==="bomb")c.classList.add("bomb");
+if(g==="explosion")c.classList.add("explosion");
+if(g==="heart")c.classList.add("heart");
+});
+}
+
 /* PLAYER */
 function drawPlayer(){
 p.style.transform=`translate(${player.x*step}px,${player.y*step}px)`;
 }
 
-/* DAMAGE */
-function hit(){
-player.hp--;
-hud.innerHTML=`❤️ ${player.hp} | 💣 ${player.range}`;
-if(player.hp<=0){
-alert("Game Over");
-location.reload();
-}
-}
-
-/* 🔥 FIX COLLISION */
+/* COLLISION */
 function isBlocked(x,y){
 if(y<0||y>=rows||x<0||x>=cols) return true;
 return grid[y][x]==="wall"||grid[y][x]==="block";
 }
 
 function collide(nx,ny){
-return (
-isBlocked(Math.floor(nx-radius),Math.floor(ny-radius)) ||
-isBlocked(Math.floor(nx+radius),Math.floor(ny-radius)) ||
-isBlocked(Math.floor(nx-radius),Math.floor(ny+radius)) ||
-isBlocked(Math.floor(nx+radius),Math.floor(ny+radius))
-);
+let pts=[
+[nx-radius,ny-radius],
+[nx+radius,ny-radius],
+[nx-radius,ny+radius],
+[nx+radius,ny+radius]
+];
+return pts.some(([px,py])=>{
+return isBlocked(Math.floor(px),Math.floor(py));
+});
 }
 
 /* LOOP */
@@ -217,11 +230,17 @@ let vx=0,vy=0;
 
 function loop(){
 
+// lock axis
+if(Math.abs(vx)>Math.abs(vy)) vy=0;
+else vx=0;
+
 let nx=player.x+vx*speed;
-if(!collide(nx,player.y)) player.x=nx; else vx=0;
+if(!collide(nx,player.y)) player.x=nx;
+else player.x=Math.round(player.x);
 
 let ny=player.y+vy*speed;
-if(!collide(player.x,ny)) player.y=ny; else vy=0;
+if(!collide(player.x,ny)) player.y=ny;
+else player.y=Math.round(player.y);
 
 drawPlayer();
 requestAnimationFrame(loop);
@@ -269,6 +288,7 @@ setTimeout(()=>{
 [[0,0],[1,0],[-1,0],[0,1],[0,-1]].forEach(([dx,dy])=>{
 for(let i=0;i<2;i++){
 let nx=x+dx*i,ny=y+dy*i;
+
 if(grid[ny][nx]=="wall")break;
 
 if(grid[ny][nx]=="block"){
@@ -277,8 +297,6 @@ break;
 }
 
 grid[ny][nx]="explosion";
-
-if(Math.round(player.x)==nx&&Math.round(player.y)==ny) hit();
 
 enemies=enemies.filter(e=>{
 if(e.x===nx&&e.y===ny){e.el.remove();return false;}
@@ -327,30 +345,17 @@ if(grid[ny]?.[nx]=="empty"){e.x=nx;e.y=ny;}
 e.el.style.transform=`translate(${e.x*step}px,${e.y*step}px)`;
 
 if(Math.round(player.x)==e.x && Math.round(player.y)==e.y){
-hit();
+player.hp--;
+hud.innerHTML=`❤️ ${player.hp} | 💣 ${player.range}`;
 }
 });
 },500);
 
-/* DRAW */
-function draw(){
-document.querySelectorAll(".cell").forEach((c,i)=>{
-c.className="cell";
-let x=i%cols,y=Math.floor(i/cols),g=grid[y][x];
-
-if(g==="wall")c.classList.add("wall");
-if(g==="block")c.classList.add("block");
-if(g==="bomb")c.classList.add("bomb");
-if(g==="explosion")c.classList.add("explosion");
-if(g==="heart")c.classList.add("heart");
-});
-}
-
 /* START */
 createMap();
 spawnEnemies(3);
-drawPlayer();
 draw();
+drawPlayer();
 scale();
 </script>
 
