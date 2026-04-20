@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 
-<title>Bomberman Mobile Pro</title>
+<title>Kin Bomber Mobile</title>
 
 <style>
 :root{
@@ -15,19 +15,18 @@
 html,body{
 margin:0;
 padding:0;
-width:100%;
-height:100%;
-overflow:hidden;
 background:#0b0f1a;
+overflow:hidden;
 font-family:sans-serif;
 }
 
-/* 🎮 GAME CENTER */
-#gameWrap{
+/* GAME */
+#wrap{
 position:absolute;
 top:50%;
 left:50%;
 transform:translate(-50%,-50%);
+will-change: transform;
 }
 
 #game{
@@ -37,7 +36,6 @@ grid-template-rows:repeat(13,40px);
 gap:2px;
 }
 
-/* TILE */
 .cell{width:40px;height:40px;background:#1e293b;}
 .wall{background:#475569;}
 .block{background:url('monst/block.png');background-size:cover;}
@@ -47,39 +45,33 @@ background:url('monst/bomb.png');
 background-size:cover;
 animation:blink .5s infinite;
 }
+@keyframes blink{50%{transform:scale(1.2)}}
 
-@keyframes blink{
-50%{transform:scale(1.2)}
-}
-
-/* 💥 EXPLOSION */
 .explosion{
 background:url('monst/explode.png');
 background-size:160px 40px;
 animation:exp .4s steps(4) forwards;
 }
-@keyframes exp{
-to{background-position:-160px}
-}
+@keyframes exp{to{background-position:-160px}}
 
 .heart{background:url('monst/heart.png');background-size:cover;}
 
 .enemy{
-width:40px;height:40px;
 position:absolute;
+width:40px;height:40px;
 background-size:cover;
 z-index:5;
 }
 
 #player{
+position:absolute;
 width:40px;height:40px;
 background:url('monst/p1_idle.png');
 background-size:160px 40px;
-position:absolute;
 z-index:10;
 }
 
-/* 🧊 HUD */
+/* HUD */
 #hud{
 position:fixed;
 top:10px;
@@ -88,11 +80,10 @@ transform:translateX(-50%);
 background:var(--glass);
 padding:8px 16px;
 border-radius:20px;
-backdrop-filter: blur(10px);
-font-size:14px;
+backdrop-filter:blur(10px);
 }
 
-/* 🎮 JOYSTICK */
+/* JOY */
 #joy{
 position:fixed;
 left:5vw;
@@ -101,7 +92,6 @@ width:20vw;height:20vw;
 max-width:140px;max-height:140px;
 border-radius:50%;
 background:var(--glass);
-backdrop-filter:blur(8px);
 }
 #stick{
 width:50%;height:50%;
@@ -111,7 +101,7 @@ position:absolute;
 left:25%;top:25%;
 }
 
-/* 💣 BUTTON */
+/* BOMB BTN */
 #bombBtn{
 position:fixed;
 right:5vw;
@@ -124,22 +114,7 @@ display:flex;
 justify-content:center;
 align-items:center;
 font-size:6vw;
-backdrop-filter:blur(10px);
 }
-
-/* ⛶ FULLSCREEN */
-#fullBtn{
-position:fixed;
-top:10px;
-right:10px;
-width:45px;height:45px;
-border-radius:10px;
-background:var(--ui);
-display:flex;
-justify-content:center;
-align-items:center;
-}
-
 </style>
 </head>
 
@@ -147,7 +122,7 @@ align-items:center;
 
 <div id="hud">❤️ 3 | 💣 1</div>
 
-<div id="gameWrap">
+<div id="wrap">
   <div id="game">
     <div id="player"></div>
   </div>
@@ -155,35 +130,33 @@ align-items:center;
 
 <div id="joy"><div id="stick"></div></div>
 <div id="bombBtn">💣</div>
-<div id="fullBtn">⛶</div>
 
 <script>
-const rows=13,cols=15,step=42;
-let grid=[],enemies=[],bombs=[];
+/* ===== CORE ===== */
+const cellSize=40;
+const gap=2;
+const step=cellSize+gap;
+
+const rows=13,cols=15;
+
+let grid=[],enemies=[];
 let player={x:1,y:1,hp:3,range:1};
 
 const game=document.getElementById("game");
-const wrap=document.getElementById("gameWrap");
+const wrap=document.getElementById("wrap");
 const p=document.getElementById("player");
 const hud=document.getElementById("hud");
 
-/* 📐 AUTO SCALE */
-function scaleGame(){
-let w=window.innerWidth;
-let h=window.innerHeight;
-
-let baseW=cols*42;
-let baseH=rows*42;
-
-let s=Math.min(w/baseW,h/baseH);
+/* ===== SCALE ===== */
+function scale(){
+let s=Math.min(window.innerWidth/(cols*step),window.innerHeight/(rows*step));
 s=Math.max(0.6,Math.min(s,1.2));
-
 wrap.style.transform=`translate(-50%,-50%) scale(${s})`;
 }
-window.addEventListener("resize",scaleGame);
+window.addEventListener("resize",scale);
 
-/* MAP */
-function map(){
+/* ===== MAP ===== */
+function createMap(){
 grid=[];game.innerHTML="";
 for(let y=0;y<rows;y++){
 let r=[];
@@ -204,7 +177,7 @@ grid.push(r);
 game.appendChild(p);
 }
 
-/* PLAYER */
+/* ===== PLAYER ===== */
 function drawPlayer(){
 p.style.transform=`translate(${player.x*step}px,${player.y*step}px)`;
 }
@@ -213,21 +186,26 @@ p.style.transform=`translate(${player.x*step}px,${player.y*step}px)`;
 function hit(){
 player.hp--;
 hud.innerHTML=`❤️ ${player.hp} | 💣 ${player.range}`;
-if(player.hp<=0){alert("Game Over");location.reload();}
+if(player.hp<=0){
+alert("Game Over");
+location.reload();
+}
 }
 
-/* 🎮 ANALOG */
+/* 🎮 ANALOG (ลดความเร็ว) */
 let vx=0,vy=0;
+const speed=0.05; // 🔥 ลดความเร็วตรงนี้
 
 function loop(){
-let nx=player.x+vx;
-let ny=player.y+vy;
+let nx=player.x+vx*speed;
+let ny=player.y+vy*speed;
 
-let gx=Math.round(nx);
-let gy=Math.round(ny);
+let gx=Math.floor(nx+0.5);
+let gy=Math.floor(ny+0.5);
 
 if(grid[gy]?.[gx]!=="wall" && grid[gy]?.[gx]!=="block"){
-player.x=nx;player.y=ny;
+player.x=nx;
+player.y=ny;
 }
 
 drawPlayer();
@@ -235,7 +213,7 @@ requestAnimationFrame(loop);
 }
 loop();
 
-/* JOY */
+/* ===== JOYSTICK ===== */
 let joy=document.getElementById("joy");
 let stick=document.getElementById("stick");
 
@@ -254,8 +232,9 @@ if(dist>max){dx=dx/dist*max;dy=dy/dist*max;}
 
 stick.style.transform=`translate(${dx}px,${dy}px)`;
 
-vx=dx/80;
-vy=dy/80;
+/* normalize */
+vx=dx/40;
+vy=dy/40;
 });
 
 joy.addEventListener("touchend",()=>{
@@ -277,6 +256,7 @@ setTimeout(()=>{
 [[0,0],[1,0],[-1,0],[0,1],[0,-1]].forEach(([dx,dy])=>{
 for(let i=0;i<2;i++){
 let nx=x+dx*i,ny=y+dy*i;
+
 if(grid[ny][nx]=="wall")break;
 
 if(grid[ny][nx]=="block"){
@@ -286,7 +266,16 @@ break;
 
 grid[ny][nx]="explosion";
 
-if(Math.round(player.x)==nx&&Math.round(player.y)==ny)hit();
+if(Math.round(player.x)==nx && Math.round(player.y)==ny) hit();
+
+/* kill enemy */
+enemies=enemies.filter(e=>{
+if(e.x===nx&&e.y===ny){
+e.el.remove();
+return false;
+}
+return true;
+});
 }
 });
 draw();
@@ -300,6 +289,44 @@ draw();
 
 },1200);
 };
+
+/* 👾 ENEMY */
+function spawnEnemies(n=3){
+enemies=[];
+document.querySelectorAll(".enemy").forEach(e=>e.remove());
+
+while(enemies.length<n){
+let x=Math.floor(Math.random()*cols);
+let y=Math.floor(Math.random()*rows);
+
+if(grid[y][x]=="empty" && (x>3||y>3)){
+let el=document.createElement("div");
+el.className="enemy";
+el.style.backgroundImage="url(monst/mushroom.png)";
+game.appendChild(el);
+
+enemies.push({x,y,el});
+}
+}
+}
+
+setInterval(()=>{
+enemies.forEach(e=>{
+let dirs=[[1,0],[-1,0],[0,1],[0,-1]];
+let r=dirs[Math.floor(Math.random()*4)];
+let nx=e.x+r[0],ny=e.y+r[1];
+
+if(grid[ny]?.[nx]=="empty"){
+e.x=nx;e.y=ny;
+}
+
+e.el.style.transform=`translate(${e.x*step}px,${e.y*step}px)`;
+
+if(Math.round(player.x)==e.x && Math.round(player.y)==e.y){
+hit();
+}
+});
+},500);
 
 /* DRAW */
 function draw(){
@@ -316,10 +343,11 @@ if(g==="heart")c.classList.add("heart");
 }
 
 /* START */
-map();
+createMap();
+spawnEnemies(3);
 drawPlayer();
 draw();
-scaleGame();
+scale();
 </script>
 
 </body>
