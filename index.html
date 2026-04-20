@@ -15,14 +15,11 @@ html, body {
   overflow:hidden;
   background:#111;
   touch-action:none;
-  padding-top: 60px; /* เผื่อ address bar */
   padding-top: env(safe-area-inset-top);
 }
 
-/* GAME */
-
 #game {
-    position:absolute;
+  position:absolute;
   top:50%;
   left:50%;
   transform:translate(-50%, -50%) scale(0.8);
@@ -34,13 +31,14 @@ html, body {
 
 .cell { width:40px; height:40px; background:#333; }
 .wall { background:#777; }
-
 .block { background:url('monst/block.png'); background-size:cover; }
+
 .bomb {
   background:url('monst/bomb.png');
   background-size:cover;
   animation:blink 0.5s infinite;
 }
+
 @keyframes blink {
   0%{transform:scale(1)}
   50%{transform:scale(1.2)}
@@ -49,7 +47,6 @@ html, body {
 
 .explosion { background:orange; }
 .power { background:gold; }
-
 .heart { background:url('monst/heart.png'); background-size:cover; }
 
 .enemySprite {
@@ -57,6 +54,7 @@ html, body {
   height:40px;
   position:absolute;
   background-size:cover;
+  z-index:5;
 }
 
 #player {
@@ -65,9 +63,10 @@ html, body {
   background:url('monst/p1_idle.png');
   background-size:160px 40px;
   position:absolute;
+  z-index:10;
 }
 
-/* 🎮 JOYSTICK */
+/* joystick */
 #joystick {
   position:fixed;
   left:30px;
@@ -76,7 +75,6 @@ html, body {
   height:120px;
   border-radius:50%;
   background:rgba(255,255,255,0.08);
-  backdrop-filter: blur(5px);
 }
 
 #stick {
@@ -89,7 +87,7 @@ html, body {
   top:30px;
 }
 
-/* 💣 bomb button */
+/* bomb */
 #bombBtn {
   position:fixed;
   right:30px;
@@ -104,7 +102,7 @@ html, body {
   font-size:30px;
 }
 
-/* ⛶ fullscreen */
+/* fullscreen */
 #fullscreenBtn {
   position:fixed;
   top:20px;
@@ -116,24 +114,8 @@ html, body {
   display:flex;
   justify-content:center;
   align-items:center;
-  font-size:22px;
 }
 
-@media (orientation:portrait){
-  body::before{
-    content:"🔄 หมุนจอ";
-    position:fixed;
-    width:100%;
-    height:100%;
-    background:#000;
-    color:#fff;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    font-size:30px;
-    z-index:999;
-  }
-}
 </style>
 </head>
 
@@ -143,27 +125,39 @@ html, body {
   <div id="player"></div>
 </div>
 
-<!-- UI -->
 <div id="joystick"><div id="stick"></div></div>
 <div id="bombBtn">💣</div>
 <div id="fullscreenBtn">⛶</div>
 
 <script>
 const rows=13, cols=15, step=42;
-let grid=[], bombs=[];
+
+let grid=[], bombs=[], enemies=[];
 let player={x:1,y:1,hp:3,range:1};
+
+const enemyImages=[
+'monst/batty.png','monst/boo.png','monst/mushroom.png',
+'monst/slurp.png','monst/kabuto.png','monst/spike.png'
+];
 
 const game=document.getElementById("game");
 const playerSprite=document.getElementById("player");
 
-/* ===== PLAYER ===== */
+/* PLAYER */
 function updatePlayer(){
   playerSprite.style.transform=
     `translate(${player.x*step}px,${player.y*step}px)`;
 }
 
-/* ===== MOVE ===== */
+/* MOVE (แก้ไวเกิน) */
+let lastMove=0;
+const moveDelay=120;
+
 function move(dir){
+  let now=Date.now();
+  if(now-lastMove < moveDelay) return;
+  lastMove=now;
+
   let nx=player.x, ny=player.y;
 
   if(dir==="up") ny--;
@@ -178,10 +172,11 @@ function move(dir){
     if(grid[ny][nx]==="heart"){player.hp++; grid[ny][nx]="empty";}
   }
 
-  updatePlayer(); draw();
+  updatePlayer();
+  draw();
 }
 
-/* ===== JOYSTICK ===== */
+/* JOYSTICK */
 let joy=document.getElementById("joystick");
 let stick=document.getElementById("stick");
 
@@ -225,7 +220,7 @@ joy.addEventListener("touchend", ()=>{
   stick.style.transform="translate(0,0)";
 });
 
-/* ===== BOMB ===== */
+/* BOMB */
 document.getElementById("bombBtn")
 .addEventListener("touchstart",()=>placeBomb(player.x,player.y));
 
@@ -255,6 +250,14 @@ function explode(b){
       }
 
       grid[ny][nx]="explosion";
+
+      enemies=enemies.filter(e=>{
+        if(e.x===nx&&e.y===ny){
+          e.el.remove();
+          return false;
+        }
+        return true;
+      });
     }
   });
 
@@ -268,7 +271,53 @@ function explode(b){
   },500);
 }
 
-/* ===== FULLSCREEN ===== */
+/* ENEMIES */
+function spawnEnemies(count=3){
+  enemies=[];
+  document.querySelectorAll(".enemySprite").forEach(e=>e.remove());
+
+  while(enemies.length<count){
+    let x=Math.floor(Math.random()*cols);
+    let y=Math.floor(Math.random()*rows);
+
+    if(grid[y][x]==="empty" && (x>3 || y>3)){
+      let el=document.createElement("div");
+      el.className="enemySprite";
+      el.style.backgroundImage=
+        `url(${enemyImages[Math.floor(Math.random()*6)]})`;
+
+      game.appendChild(el);
+      enemies.push({x,y,el});
+    }
+  }
+}
+
+function updateEnemies(){
+  enemies.forEach(e=>{
+    e.el.style.transform=
+      `translate(${e.x*step}px,${e.y*step}px)`;
+  });
+}
+
+/* AI */
+setInterval(()=>{
+  enemies.forEach(e=>{
+    let dirs=[[0,1],[0,-1],[1,0],[-1,0]];
+    let r=dirs[Math.floor(Math.random()*4)];
+
+    let nx=e.x+r[0];
+    let ny=e.y+r[1];
+
+    if(grid[ny]?.[nx]==="empty"){
+      e.x=nx;
+      e.y=ny;
+    }
+  });
+
+  updateEnemies();
+},500);
+
+/* FULLSCREEN */
 document.getElementById("fullscreenBtn")
 .addEventListener("click",()=>{
   if(!document.fullscreenElement){
@@ -278,7 +327,7 @@ document.getElementById("fullscreenBtn")
   }
 });
 
-/* ===== MAP ===== */
+/* MAP */
 function createMap(){
   grid=[]; game.innerHTML="";
   for(let y=0;y<rows;y++){
@@ -300,11 +349,12 @@ function createMap(){
   game.appendChild(playerSprite);
 }
 
-/* ===== DRAW ===== */
+/* DRAW */
 function draw(){
   document.querySelectorAll(".cell").forEach((c,i)=>{
     c.className="cell";
     let x=i%cols,y=Math.floor(i/cols),g=grid[y][x];
+
     if(g==="wall") c.classList.add("wall");
     if(g==="block") c.classList.add("block");
     if(g==="bomb") c.classList.add("bomb");
@@ -312,10 +362,13 @@ function draw(){
     if(g==="power") c.classList.add("power");
     if(g==="heart") c.classList.add("heart");
   });
+
+  updateEnemies();
 }
 
-/* ===== START ===== */
+/* START */
 createMap();
+spawnEnemies(3);
 updatePlayer();
 draw();
 </script>
