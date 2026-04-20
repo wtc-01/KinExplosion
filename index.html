@@ -198,28 +198,34 @@ const speed=0.08; // 🔥 ลดความเร็วตรงนี้
 
 const margin = 0.2; // 🔥 กันติดมุม
 
+function isBlocked(x,y){
+  return grid[y]?.[x]==="wall" || grid[y]?.[x]==="block";
+}
+
+function collide(nx, ny){
+  return (
+    isBlocked(Math.floor(nx - radius), Math.floor(ny - radius)) ||
+    isBlocked(Math.floor(nx + radius), Math.floor(ny - radius)) ||
+    isBlocked(Math.floor(nx - radius), Math.floor(ny + radius)) ||
+    isBlocked(Math.floor(nx + radius), Math.floor(ny + radius))
+  );
+}
+
 function loop(){
 
   // ===== X =====
   let nx = player.x + vx * speed;
-  let ny = player.y;
 
-  let gx = Math.floor(nx + (vx > 0 ? margin : -margin));
-  let gy = Math.floor(player.y + 0.5);
-
-  if(grid[gy]?.[gx] !== "wall" && grid[gy]?.[gx] !== "block"){
+  if(!collide(nx, player.y)){
     player.x = nx;
   } else {
     vx = 0;
   }
 
   // ===== Y =====
-  ny = player.y + vy * speed;
+  let ny = player.y + vy * speed;
 
-  gx = Math.floor(player.x + 0.5);
-  gy = Math.floor(ny + (vy > 0 ? margin : -margin));
-
-  if(grid[gy]?.[gx] !== "wall" && grid[gy]?.[gx] !== "block"){
+  if(!collide(player.x, ny)){
     player.y = ny;
   } else {
     vy = 0;
