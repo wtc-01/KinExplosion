@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Bomberman Touch</title>
+
+<style>
+body {
+  text-align:center;
+  background:#111;
+  color:white;
+  font-family:sans-serif;
+  touch-action:none;
+}
+
+#game {
+  display:grid;
+  grid-template-columns: repeat(15, 40px);
+  grid-template-rows: repeat(13, 40px);
+  gap:2px;
+  margin:auto;
+  width:max-content;
+  position:relative;
+}
+
+.cell { width:40px; height:40px; background:#333; }
+.wall { background:#777; }
+
+.block {
+  background-image:url('monst/block.png');
+  background-size:40px 40px;
+}
+
+.bomb {
+  background-image:url('monst/bomb.png');
+  background-size:40px 40px;
+  animation: blink 0.5s infinite;
+}
+
+@keyframes blink {
+  0%{transform:scale(1)}
+  50%{transform:scale(1.2)}
+  100%{transform:scale(1)}
+}
+
+.explosion { background:orange; }
+.power { background:gold; }
+
+.heart {
+  background-image:url('monst/heart.png');
+  background-size:40px 40px;
+}
+
+.enemySprite {
+  width:40px;
+  height:40px;
+  position:absolute;
+  background-size:40px 40px;
+  z-index:9;
+}
+
+#player {
+  width:40px;
+  height:40px;
+  background-image:url('monst/p1_idle.png');
+  background-size:160px 40px;
+  position:absolute;
+  z-index:10;
+}
+
+#bombBtn {
+  position:fixed;
+  right:30px;
+  bottom:30px;
+  width:70px;
+  height:70px;
+  border-radius:50%;
+  background:rgba(255,255,255,0.2);
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  font-size:30px;
+}
+
+#info { margin:10px; }
+</style>
+</head>
+
+<body>
+
+<h2>💣 Bomberman Touch</h2>
+<div id="info"></div>
+
+<div id="game">
+  <div id="player"></div>
+</div>
+
+<div id="bombBtn">💣</div>
+
+<script>
+const rows=13, cols=15;
+const step=42;
+
+let grid=[], level=1;
+let player={x:1,y:1,hp:3,range:1};
+let enemies=[], bombs=[];
+
+const enemyImages=[
+'monst/batty.png','monst/boo.png','monst/mushroom.png',
+'monst/slurp.png','monst/kabuto.png','monst/spike.png'
+];
+
+const game=document.getElementById("game");
+const info=document.getElementById("info");
+const playerSprite=document.getElementById("player");
+
+// ===== PLAYER =====
+function updatePlayerPos(){
+  playerSprite.style.transform =
+    `translate(${player.x*step}px, ${player.y*step}px)`;
+}
+
+// ===== MOVE =====
+function move(dir){
+  let nx=player.x, ny=player.y;
+
+  if(dir==="up") ny--;
+  if(dir==="down") ny++;
+  if(dir==="left") nx--;
+  if(dir==="right") nx++;
+
+  if(grid[ny]?.[nx]!=="wall" && grid[ny]?.[nx]!=="block"){
+    player.x=nx; player.y=ny;
+
+    if(grid[ny][nx]==="power"){
+      player.range++;
+      grid[ny][nx]="empty";
+    }
+
+    if(grid[ny][nx]==="heart"){
+      player.hp=Math.min(player.hp+1,50);
+      grid[ny][nx]="empty";
+    }
+  }
+
+  updatePlayerPos();
+  draw();
+}
+
+// ===== SWIPE =====
+let sx=0, sy=0;
+
+game.addEventListener("touchstart",e=>{
+  let t=e.touches[0];
+  sx=t.clientX;
+  sy=t.clientY;
+});
+
+game.addEventListener("touchend",e=>{
+  let t=e.changedTouches[0];
+  let dx=t.clientX-sx;
+  let dy=t.clientY-sy;
+
+  if(Math.abs(dx)<20 && Math.abs(dy)<20) return;
+
+  if(Math.abs(dx)>Math.abs(dy)){
+    move(dx>0?"right":"left");
+  }else{
+    move(dy>0?"down":"up");
+  }
+});
+
+// ===== BOMB BUTTON =====
+document.getElementById("bombBtn")
+.addEventListener("touchstart",()=>{
+  placeBomb(player.x,player.y);
+});
+
+// ===== MAP =====
+function createMap(){
+  grid=[];
+  game.querySelectorAll(".cell").forEach(c=>c.remove());
+
+  for(let y=0;y<rows;y++){
+    let row=[];
+    for(let x=0;x<cols;x++){
+      let cell=document.createElement("div");
+      cell.classList.add("cell");
+
+      if(y===0||x===0||y===rows-1||x===cols-1||(x%2===0&&y%2===0)){
+        row.push("wall");
+      } else if(Math.random()<0.3){
+        row.push("block");
+      } else row.push("empty");
+
+      game.appendChild(cell);
+    }
+    grid.push(row);
+  }
+
+  game.appendChild(playerSprite);
+  grid[1][1]=grid[1][2]=grid[2][1]=grid[2][2]="empty";
+}
+
+// ===== ENEMY =====
+function spawnEnemies(count){
+  enemies=[];
+  document.querySelectorAll(".enemySprite").forEach(e=>e.remove());
+
+  while(enemies.length<count){
+    let x=Math.floor(Math.random()*cols);
+    let y=Math.floor(Math.random()*rows);
+
+    if(grid[y][x]==="empty" &&
+       Math.abs(x-player.x)+Math.abs(y-player.y)>6){
+
+      let el=document.createElement("div");
+      el.className="enemySprite";
+      el.style.backgroundImage=
+        `url(${enemyImages[Math.floor(Math.random()*6)]})`;
+
+      game.appendChild(el);
+      enemies.push({x,y,el});
+    }
+  }
+}
+
+function updateEnemies(){
+  enemies.forEach(e=>{
+    e.el.style.transform=
+      `translate(${e.x*step}px,${e.y*step}px)`;
+  });
+}
+
+// ===== DRAW =====
+function draw(){
+  document.querySelectorAll(".cell").forEach((cell,i)=>{
+    cell.className="cell";
+    let x=i%cols,y=Math.floor(i/cols);
+    let g=grid[y][x];
+
+    if(g==="wall") cell.classList.add("wall");
+    if(g==="block") cell.classList.add("block");
+    if(g==="bomb") cell.classList.add("bomb");
+    if(g==="explosion") cell.classList.add("explosion");
+    if(g==="power") cell.classList.add("power");
+    if(g==="heart") cell.classList.add("heart");
+  });
+
+  info.innerHTML=`Lv ${level} | ❤️ ${player.hp} | 💥 ${player.range}`;
+  updateEnemies();
+}
+
+// ===== BOMB =====
+function placeBomb(x,y){
+  if(grid[y][x]!=="empty") return;
+
+  let bomb={x,y,exploded:false};
+  bombs.push(bomb);
+  grid[y][x]="bomb";
+  draw();
+
+  setTimeout(()=>explodeBomb(bomb),1500);
+}
+
+function explodeBomb(b){
+  if(b.exploded) return;
+  b.exploded=true;
+
+  let dirs=[[0,0],[1,0],[-1,0],[0,1],[0,-1]];
+
+  dirs.forEach(([dx,dy])=>{
+    for(let i=0;i<=player.range;i++){
+      let nx=b.x+dx*i, ny=b.y+dy*i;
+      if(grid[ny][nx]==="wall") break;
+
+      if(grid[ny][nx]==="block"){
+        let r=Math.random();
+        if(r<0.2) grid[ny][nx]="heart";
+        else if(r<0.3) grid[ny][nx]="power";
+        else grid[ny][nx]="empty";
+        break;
+      }
+
+      grid[ny][nx]="explosion";
+
+      enemies=enemies.filter(e=>{
+        if(e.x===nx&&e.y===ny){
+          e.el.remove();
+          return false;
+        }
+        return true;
+      });
+    }
+  });
+
+  draw();
+
+  setTimeout(()=>{
+    for(let y=0;y<rows;y++){
+      for(let x=0;x<cols;x++){
+        if(grid[y][x]==="explosion") grid[y][x]="empty";
+      }
+    }
+    draw();
+  },500);
+}
+
+// ===== AI =====
+setInterval(()=>{
+  enemies.forEach(e=>{
+    let dirs=[[0,1],[0,-1],[1,0],[-1,0]];
+    let r=dirs[Math.floor(Math.random()*4)];
+    let nx=e.x+r[0], ny=e.y+r[1];
+
+    if(grid[ny]?.[nx]==="empty"){
+      e.x=nx; e.y=ny;
+    }
+  });
+  draw();
+},500);
+
+// ===== START =====
+createMap();
+spawnEnemies(2);
+updatePlayerPos();
+draw();
+</script>
+
+</body>
+</html>
