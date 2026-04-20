@@ -15,14 +15,17 @@ html, body {
   overflow:hidden;
   background:#111;
   touch-action:none;
+  padding-top: 60px; /* เผื่อ address bar */
+  padding-top: env(safe-area-inset-top);
 }
 
 /* GAME */
+
 #game {
-  position:absolute;
+    position:absolute;
   top:50%;
   left:50%;
-  transform:translate(-50%, -50%);
+  transform:translate(-50%, -50%) scale(0.8);
   display:grid;
   grid-template-columns: repeat(15, 40px);
   grid-template-rows: repeat(13, 40px);
