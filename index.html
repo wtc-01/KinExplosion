@@ -155,26 +155,33 @@ window.addEventListener("resize",scale);
 
 /* MAP */
 function createMap(){
-grid=[];game.innerHTML="";
-for(let y=0;y<rows;y++){
-let r=[];
-for(let x=0;x<cols;x++){
-let c=document.createElement("div");
-c.className="cell";
+  grid=[];
 
-if(y===0||x===0||y===rows-1||x===cols-1||(x%2==0&&y%2==0)){
-r.push("wall");c.classList.add("wall");
-}else if(Math.random()<0.3){
-r.push("block");c.classList.add("block");
-}else r.push("empty");
+  // 🔥 ลบเฉพาะ cell (ไม่ลบ player)
+  game.querySelectorAll(".cell").forEach(c=>c.remove());
 
-game.appendChild(c);
-}
-grid.push(r);
-}
-game.appendChild(p);
-}
+  for(let y=0;y<rows;y++){
+    let r=[];
+    for(let x=0;x<cols;x++){
+      let c=document.createElement("div");
+      c.className="cell";
 
+      if(y===0||x===0||y===rows-1||x===cols-1||(x%2==0&&y%2==0)){
+        r.push("wall"); c.classList.add("wall");
+      } else if(Math.random()<0.3){
+        r.push("block"); c.classList.add("block");
+      } else {
+        r.push("empty");
+      }
+
+      game.appendChild(c);
+    }
+    grid.push(r);
+  }
+
+  // 🔥 ย้าย player ไปอยู่บนสุดเสมอ
+  game.appendChild(p);
+}
 /* PLAYER */
 function drawPlayer(){
 p.style.transform=`translate(${player.x*step}px,${player.y*step}px)`;
