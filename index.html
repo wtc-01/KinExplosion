@@ -198,35 +198,42 @@ const speed=0.1; // 🔥 ลดความเร็วตรงนี้
 
 const margin = 0.2; // 🔥 กันติดมุม
 
+const size = 0.7; // ขนาดตัว (1 = เต็มช่อง)
+const half = size / 2;
+
 function loop(){
 
-  // ===== X =====
-  let nx = player.x + vx * speed;
-  let ny = player.y;
+// 👉 X
+let nx = player.x + vx * speed;
+function isBlocked(x,y){
+  if(y<0||y>=rows||x<0||x>=cols) return true;
+  return grid[y][x]==="wall" || grid[y][x]==="block";
+}
 
-  let gx = Math.floor(nx + (vx > 0 ? margin : -margin));
-  let gy = Math.floor(player.y + 0.5);
+function collideBox(nx, ny){
+  let left   = nx - half;
+  let right  = nx + half;
+  let top    = ny - half;
+  let bottom = ny + half;
 
-  if(grid[gy]?.[gx] !== "wall" && grid[gy]?.[gx] !== "block"){
-    player.x = nx;
-  } else {
-    vx = 0;
-  }
+  return (
+    isBlocked(Math.floor(left),  Math.floor(top)) ||
+    isBlocked(Math.floor(right), Math.floor(top)) ||
+    isBlocked(Math.floor(left),  Math.floor(bottom)) ||
+    isBlocked(Math.floor(right), Math.floor(bottom))
+  );
+}
 
-  // ===== Y =====
-  ny = player.y + vy * speed;
+// 👉 Y
+let ny = player.y + vy * speed;
+if(!collideBox(player.x, ny)){
+  player.y = ny;
+} else {
+  vy = 0;
+}
 
-  gx = Math.floor(player.x + 0.5);
-  gy = Math.floor(ny + (vy > 0 ? margin : -margin));
-
-  if(grid[gy]?.[gx] !== "wall" && grid[gy]?.[gx] !== "block"){
-    player.y = ny;
-  } else {
-    vy = 0;
-  }
-
-  drawPlayer();
-  requestAnimationFrame(loop);
+drawPlayer();
+requestAnimationFrame(loop);
 }
 loop();
 
