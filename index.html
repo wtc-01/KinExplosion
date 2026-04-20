@@ -1,1 +1,244 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#111111">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+<title>Bomberman Touch</title>
+
+<style>
+html, body {
+  margin:0;
+  padding:0;
+  width:100%;
+  height:100%;
+  overflow:hidden;
+  background:#111;
+  touch-action:none;
+}
+
+#game {
+  position:absolute;
+  top:50%;
+  left:50%;
+  transform:translate(-50%, -50%);
+  display:grid;
+  grid-template-columns: repeat(15, 40px);
+  grid-template-rows: repeat(13, 40px);
+  gap:2px;
+}
+
+.cell { width:40px; height:40px; background:#333; }
+.wall { background:#777; }
+
+.block {
+  background:url('monst/block.png');
+  background-size:cover;
+}
+
+.bomb {
+  background:url('monst/bomb.png');
+  background-size:cover;
+  animation:blink 0.5s infinite;
+}
+
+@keyframes blink {
+  0%{transform:scale(1)}
+  50%{transform:scale(1.2)}
+  100%{transform:scale(1)}
+}
+
+.explosion { background:orange; }
+.power { background:gold; }
+
+.heart {
+  background:url('monst/heart.png');
+  background-size:cover;
+}
+
+.enemySprite {
+  width:40px;
+  height:40px;
+  position:absolute;
+  background-size:cover;
+}
+
+#player {
+  width:40px;
+  height:40px;
+  background:url('monst/p1_idle.png');
+  background-size:160px 40px;
+  position:absolute;
+}
+
+#bombBtn {
+  position:fixed;
+  right:20px;
+  bottom:20px;
+  width:70px;
+  height:70px;
+  border-radius:50%;
+  background:rgba(255,255,255,0.2);
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  font-size:30px;
+}
+
+@media screen and (orientation:portrait) {
+  body::before {
+    content:"🔄 หมุนจอแนวนอน";
+    position:fixed;
+    width:100%;
+    height:100%;
+    background:#000;
+    color:#fff;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    font-size:30px;
+    z-index:999;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div id="game">
+  <div id="player"></div>
+</div>
+
+<div id="bombBtn">💣</div>
+
+<script>
+const rows=13, cols=15, step=42;
+let grid=[], player={x:1,y:1,hp:3,range:1};
+let enemies=[], bombs=[];
+
+const game=document.getElementById("game");
+const playerSprite=document.getElementById("player");
+
+// ===== PLAYER =====
+function updatePlayer(){
+  playerSprite.style.transform=
+    `translate(${player.x*step}px,${player.y*step}px)`;
+}
+
+// ===== MOVE =====
+function move(d){
+  let nx=player.x, ny=player.y;
+  if(d==="up") ny--;
+  if(d==="down") ny++;
+  if(d==="left") nx--;
+  if(d==="right") nx++;
+
+  if(grid[ny]?.[nx]!=="wall" && grid[ny]?.[nx]!=="block"){
+    player.x=nx; player.y=ny;
+
+    if(grid[ny][nx]==="power"){player.range++; grid[ny][nx]="empty";}
+    if(grid[ny][nx]==="heart"){player.hp++; grid[ny][nx]="empty";}
+  }
+  updatePlayer(); draw();
+}
+
+// ===== SWIPE =====
+let sx,sy;
+game.addEventListener("touchstart",e=>{
+  let t=e.touches[0]; sx=t.clientX; sy=t.clientY;
+});
+game.addEventListener("touchend",e=>{
+  let t=e.changedTouches[0];
+  let dx=t.clientX-sx, dy=t.clientY-sy;
+  if(Math.abs(dx)>Math.abs(dy)) move(dx>0?"right":"left");
+  else move(dy>0?"down":"up");
+});
+
+// ===== BOMB =====
+document.getElementById("bombBtn")
+.addEventListener("touchstart",()=>placeBomb(player.x,player.y));
+
+function placeBomb(x,y){
+  if(grid[y][x]!=="empty") return;
+  let b={x,y}; bombs.push(b); grid[y][x]="bomb"; draw();
+  setTimeout(()=>explode(b),1500);
+}
+
+function explode(b){
+  [[0,0],[1,0],[-1,0],[0,1],[0,-1]].forEach(([dx,dy])=>{
+    for(let i=0;i<=player.range;i++){
+      let nx=b.x+dx*i, ny=b.y+dy*i;
+      if(grid[ny][nx]==="wall") break;
+
+      if(grid[ny][nx]==="block"){
+        let r=Math.random();
+        if(r<0.2) grid[ny][nx]="heart";
+        else if(r<0.3) grid[ny][nx]="power";
+        else grid[ny][nx]="empty";
+        break;
+      }
+
+      grid[ny][nx]="explosion";
+    }
+  });
+
+  setTimeout(()=>{
+    for(let y=0;y<rows;y++){
+      for(let x=0;x<cols;x++){
+        if(grid[y][x]==="explosion") grid[y][x]="empty";
+      }
+    }
+    draw();
+  },500);
+}
+
+// ===== MAP =====
+function createMap(){
+  grid=[]; game.innerHTML="";
+  for(let y=0;y<rows;y++){
+    let row=[];
+    for(let x=0;x<cols;x++){
+      let c=document.createElement("div");
+      c.className="cell";
+
+      if(y===0||x===0||y===rows-1||x===cols-1||(x%2===0&&y%2===0)){
+        row.push("wall"); c.classList.add("wall");
+      } else if(Math.random()<0.3){
+        row.push("block"); c.classList.add("block");
+      } else row.push("empty");
+
+      game.appendChild(c);
+    }
+    grid.push(row);
+  }
+  game.appendChild(playerSprite);
+}
+
+// ===== DRAW =====
+function draw(){
+  document.querySelectorAll(".cell").forEach((c,i)=>{
+    c.className="cell";
+    let x=i%cols,y=Math.floor(i/cols),g=grid[y][x];
+    if(g==="wall") c.classList.add("wall");
+    if(g==="block") c.classList.add("block");
+    if(g==="bomb") c.classList.add("bomb");
+    if(g==="explosion") c.classList.add("explosion");
+    if(g==="power") c.classList.add("power");
+    if(g==="heart") c.classList.add("heart");
+  });
+}
+
+// ===== START =====
+createMap();
+updatePlayer();
+draw();
+</script>
+
+</body>
+</html>
