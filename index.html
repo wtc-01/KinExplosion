@@ -4,366 +4,309 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 
-<title>Bomberman Touch Pro</title>
+<title>Bomberman PRO+</title>
 
 <style>
-html, body {
-  margin:0;
-  padding:0;
-  width:100%;
-  height:100%;
-  overflow:hidden;
-  background:#111;
-  touch-action:none;
-  padding-top: env(safe-area-inset-top);
+html,body{
+margin:0;
+padding:0;
+background:#111;
+overflow:hidden;
+touch-action:none;
 }
 
-#game {
-  position:absolute;
-  top:50%;
-  left:50%;
-  transform:translate(-50%, -50%) scale(0.8);
-  display:grid;
-  grid-template-columns: repeat(15, 40px);
-  grid-template-rows: repeat(13, 40px);
-  gap:2px;
+#game{
+position:absolute;
+top:50%;
+left:50%;
+transform:translate(-50%,-50%) scale(0.8);
+display:grid;
+grid-template-columns:repeat(15,40px);
+grid-template-rows:repeat(13,40px);
+gap:2px;
 }
 
-.cell { width:40px; height:40px; background:#333; }
-.wall { background:#777; }
-.block { background:url('monst/block.png'); background-size:cover; }
+.cell{width:40px;height:40px;background:#333;}
+.wall{background:#777;}
+.block{background:url('monst/block.png');background-size:cover;}
 
-.bomb {
-  background:url('monst/bomb.png');
-  background-size:cover;
-  animation:blink 0.5s infinite;
+.bomb{
+background:url('monst/bomb.png');
+background-size:cover;
+animation:blink .5s infinite;
 }
 
-@keyframes blink {
-  0%{transform:scale(1)}
-  50%{transform:scale(1.2)}
-  100%{transform:scale(1)}
+@keyframes blink{
+0%{transform:scale(1)}
+50%{transform:scale(1.2)}
+100%{transform:scale(1)}
 }
 
-.explosion { background:orange; }
-.power { background:gold; }
-.heart { background:url('monst/heart.png'); background-size:cover; }
-
-.enemySprite {
-  width:40px;
-  height:40px;
-  position:absolute;
-  background-size:cover;
-  z-index:5;
+/* 💥 explosion sprite */
+.explosion{
+background:url('monst/explode.png');
+background-size:160px 40px;
+animation:explodeAnim .4s steps(4) forwards;
 }
 
-#player {
-  width:40px;
-  height:40px;
-  background:url('monst/p1_idle.png');
-  background-size:160px 40px;
-  position:absolute;
-  z-index:10;
+@keyframes explodeAnim{
+from{background-position:0px}
+to{background-position:-160px}
+}
+
+.heart{background:url('monst/heart.png');background-size:cover;}
+
+.enemySprite{
+width:40px;height:40px;
+position:absolute;
+background-size:cover;
+z-index:5;
+}
+
+#player{
+width:40px;height:40px;
+background:url('monst/p1_idle.png');
+background-size:160px 40px;
+position:absolute;
+z-index:10;
 }
 
 /* joystick */
-#joystick {
-  position:fixed;
-  left:30px;
-  bottom:30px;
-  width:120px;
-  height:120px;
-  border-radius:50%;
-  background:rgba(255,255,255,0.08);
-}
+#joy{position:fixed;left:30px;bottom:30px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,.08);}
+#stick{width:60px;height:60px;border-radius:50%;background:rgba(255,255,255,.25);position:absolute;left:30px;top:30px;}
 
-#stick {
-  width:60px;
-  height:60px;
-  border-radius:50%;
-  background:rgba(255,255,255,0.25);
-  position:absolute;
-  left:30px;
-  top:30px;
+#bombBtn{
+position:fixed;right:30px;bottom:30px;
+width:70px;height:70px;border-radius:50%;
+background:rgba(255,255,255,.2);
+display:flex;justify-content:center;align-items:center;font-size:28px;
 }
-
-/* bomb */
-#bombBtn {
-  position:fixed;
-  right:30px;
-  bottom:30px;
-  width:70px;
-  height:70px;
-  border-radius:50%;
-  background:rgba(255,255,255,0.2);
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  font-size:30px;
-}
-
-/* fullscreen */
-#fullscreenBtn {
-  position:fixed;
-  top:20px;
-  right:20px;
-  width:50px;
-  height:50px;
-  border-radius:10px;
-  background:rgba(255,255,255,0.2);
-  display:flex;
-  justify-content:center;
-  align-items:center;
-}
-
 </style>
 </head>
 
 <body>
 
-<div id="game">
-  <div id="player"></div>
-</div>
-
-<div id="joystick"><div id="stick"></div></div>
+<div id="game"><div id="player"></div></div>
+<div id="joy"><div id="stick"></div></div>
 <div id="bombBtn">💣</div>
-<div id="fullscreenBtn">⛶</div>
 
 <script>
-const rows=13, cols=15, step=42;
-
-let grid=[], bombs=[], enemies=[];
-let player={x:1,y:1,hp:3,range:1};
-
-const enemyImages=[
-'monst/batty.png','monst/boo.png','monst/mushroom.png',
-'monst/slurp.png','monst/kabuto.png','monst/spike.png'
-];
+const rows=13,cols=15,step=42;
+let grid=[],bombs=[],enemies=[];
+let player={x:1,y:1,hp:3,alive:true};
 
 const game=document.getElementById("game");
-const playerSprite=document.getElementById("player");
+const pEl=document.getElementById("player");
 
-/* PLAYER */
+/* ===== MAP ===== */
+function createMap(){
+grid=[];game.innerHTML="";
+for(let y=0;y<rows;y++){
+let row=[];
+for(let x=0;x<cols;x++){
+let c=document.createElement("div");
+c.className="cell";
+
+if(y===0||x===0||y===rows-1||x===cols-1||(x%2===0&&y%2===0)){
+row.push("wall");c.classList.add("wall");
+}else if(Math.random()<0.3){
+row.push("block");c.classList.add("block");
+}else row.push("empty");
+
+game.appendChild(c);
+}
+grid.push(row);
+}
+game.appendChild(pEl);
+}
+
+/* ===== PLAYER ===== */
 function updatePlayer(){
-  playerSprite.style.transform=
-    `translate(${player.x*step}px,${player.y*step}px)`;
+pEl.style.transform=`translate(${player.x*step}px,${player.y*step}px)`;
 }
 
-/* MOVE (แก้ไวเกิน) */
-let lastMove=0;
-const moveDelay=120;
+/* ❤️ DAMAGE / RESPAWN */
+function damage(){
+if(!player.alive) return;
+player.hp--;
 
-function move(dir){
-  let now=Date.now();
-  if(now-lastMove < moveDelay) return;
-  lastMove=now;
-
-  let nx=player.x, ny=player.y;
-
-  if(dir==="up") ny--;
-  if(dir==="down") ny++;
-  if(dir==="left") nx--;
-  if(dir==="right") nx++;
-
-  if(grid[ny]?.[nx]!=="wall" && grid[ny]?.[nx]!=="block"){
-    player.x=nx; player.y=ny;
-
-    if(grid[ny][nx]==="power"){player.range++; grid[ny][nx]="empty";}
-    if(grid[ny][nx]==="heart"){player.hp++; grid[ny][nx]="empty";}
-  }
-
-  updatePlayer();
-  draw();
+if(player.hp<=0){
+player.alive=false;
+alert("Game Over");
+location.reload();
+return;
 }
 
-/* JOYSTICK */
-let joy=document.getElementById("joystick");
+player.alive=false;
+pEl.style.opacity=0.3;
+
+setTimeout(()=>{
+player.x=1;player.y=1;
+player.alive=true;
+pEl.style.opacity=1;
+updatePlayer();
+},1500);
+}
+
+/* ===== ANALOG MOVE ===== */
+let vx=0,vy=0;
+
+function loop(){
+if(player.alive){
+let nx=player.x+vx;
+let ny=player.y+vy;
+
+let gx=Math.round(nx);
+let gy=Math.round(ny);
+
+if(grid[gy]?.[gx]!=="wall" && grid[gy]?.[gx]!=="block"){
+player.x=nx;
+player.y=ny;
+}
+updatePlayer();
+}
+requestAnimationFrame(loop);
+}
+loop();
+
+/* 🎮 JOY */
+let joy=document.getElementById("joy");
 let stick=document.getElementById("stick");
 
-let dragging=false, cx=0, cy=0;
+joy.addEventListener("touchmove",e=>{
+let r=joy.getBoundingClientRect();
+let cx=r.left+r.width/2;
+let cy=r.top+r.height/2;
 
-joy.addEventListener("touchstart", e=>{
-  dragging=true;
-  let r=joy.getBoundingClientRect();
-  cx=r.left+r.width/2;
-  cy=r.top+r.height/2;
-});
+let t=e.touches[0];
+let dx=t.clientX-cx;
+let dy=t.clientY-cy;
 
-joy.addEventListener("touchmove", e=>{
-  if(!dragging) return;
+let dist=Math.sqrt(dx*dx+dy*dy);
+let max=40;
 
-  let t=e.touches[0];
-  let dx=t.clientX-cx;
-  let dy=t.clientY-cy;
-
-  let dist=Math.sqrt(dx*dx+dy*dy);
-  let max=40;
-
-  if(dist>max){
-    dx=dx/dist*max;
-    dy=dy/dist*max;
-  }
-
-  stick.style.transform=`translate(${dx}px,${dy}px)`;
-
-  if(Math.abs(dx)>Math.abs(dy)){
-    if(dx>10) move("right");
-    else if(dx<-10) move("left");
-  }else{
-    if(dy>10) move("down");
-    else if(dy<-10) move("up");
-  }
-});
-
-joy.addEventListener("touchend", ()=>{
-  dragging=false;
-  stick.style.transform="translate(0,0)";
-});
-
-/* BOMB */
-document.getElementById("bombBtn")
-.addEventListener("touchstart",()=>placeBomb(player.x,player.y));
-
-function placeBomb(x,y){
-  if(grid[y][x]!=="empty") return;
-
-  let b={x,y};
-  bombs.push(b);
-  grid[y][x]="bomb";
-  draw();
-
-  setTimeout(()=>explode(b),1500);
+if(dist>max){
+dx=dx/dist*max;
+dy=dy/dist*max;
 }
+
+stick.style.transform=`translate(${dx}px,${dy}px)`;
+
+/* normalize */
+vx=dx/80;
+vy=dy/80;
+});
+
+joy.addEventListener("touchend",()=>{
+vx=0;vy=0;
+stick.style.transform="translate(0,0)";
+});
+
+/* 💣 BOMB */
+document.getElementById("bombBtn").ontouchstart=()=>{
+let x=Math.round(player.x);
+let y=Math.round(player.y);
+
+if(grid[y][x]!=="empty")return;
+
+let b={x,y};
+bombs.push(b);
+grid[y][x]="bomb";
+draw();
+
+setTimeout(()=>explode(b),1200);
+};
 
 function explode(b){
-  [[0,0],[1,0],[-1,0],[0,1],[0,-1]].forEach(([dx,dy])=>{
-    for(let i=0;i<=player.range;i++){
-      let nx=b.x+dx*i, ny=b.y+dy*i;
-      if(grid[ny][nx]==="wall") break;
+[[0,0],[1,0],[-1,0],[0,1],[0,-1]].forEach(([dx,dy])=>{
+for(let i=0;i<2;i++){
+let nx=b.x+dx*i,ny=b.y+dy*i;
 
-      if(grid[ny][nx]==="block"){
-        let r=Math.random();
-        if(r<0.2) grid[ny][nx]="heart";
-        else if(r<0.3) grid[ny][nx]="power";
-        else grid[ny][nx]="empty";
-        break;
-      }
+if(grid[ny][nx]==="wall")break;
 
-      grid[ny][nx]="explosion";
-
-      enemies=enemies.filter(e=>{
-        if(e.x===nx&&e.y===ny){
-          e.el.remove();
-          return false;
-        }
-        return true;
-      });
-    }
-  });
-
-  setTimeout(()=>{
-    for(let y=0;y<rows;y++){
-      for(let x=0;x<cols;x++){
-        if(grid[y][x]==="explosion") grid[y][x]="empty";
-      }
-    }
-    draw();
-  },500);
+if(grid[ny][nx]==="block"){
+grid[ny][nx]=Math.random()<0.2?"heart":"empty";
+break;
 }
 
-/* ENEMIES */
-function spawnEnemies(count=3){
-  enemies=[];
-  document.querySelectorAll(".enemySprite").forEach(e=>e.remove());
+grid[ny][nx]="explosion";
 
-  while(enemies.length<count){
-    let x=Math.floor(Math.random()*cols);
-    let y=Math.floor(Math.random()*rows);
-
-    if(grid[y][x]==="empty" && (x>3 || y>3)){
-      let el=document.createElement("div");
-      el.className="enemySprite";
-      el.style.backgroundImage=
-        `url(${enemyImages[Math.floor(Math.random()*6)]})`;
-
-      game.appendChild(el);
-      enemies.push({x,y,el});
-    }
-  }
+/* hit player */
+if(Math.round(player.x)===nx && Math.round(player.y)===ny){
+damage();
 }
 
-function updateEnemies(){
-  enemies.forEach(e=>{
-    e.el.style.transform=
-      `translate(${e.x*step}px,${e.y*step}px)`;
-  });
+/* hit enemy */
+enemies=enemies.filter(e=>{
+if(e.x===nx&&e.y===ny){
+e.el.remove();
+return false;
 }
-
-/* AI */
-setInterval(()=>{
-  enemies.forEach(e=>{
-    let dirs=[[0,1],[0,-1],[1,0],[-1,0]];
-    let r=dirs[Math.floor(Math.random()*4)];
-
-    let nx=e.x+r[0];
-    let ny=e.y+r[1];
-
-    if(grid[ny]?.[nx]==="empty"){
-      e.x=nx;
-      e.y=ny;
-    }
-  });
-
-  updateEnemies();
-},500);
-
-/* FULLSCREEN */
-document.getElementById("fullscreenBtn")
-.addEventListener("click",()=>{
-  if(!document.fullscreenElement){
-    document.documentElement.requestFullscreen();
-  } else {
-    document.exitFullscreen();
-  }
+return true;
+});
+}
 });
 
-/* MAP */
-function createMap(){
-  grid=[]; game.innerHTML="";
-  for(let y=0;y<rows;y++){
-    let row=[];
-    for(let x=0;x<cols;x++){
-      let c=document.createElement("div");
-      c.className="cell";
+draw();
 
-      if(y===0||x===0||y===rows-1||x===cols-1||(x%2===0&&y%2===0)){
-        row.push("wall"); c.classList.add("wall");
-      } else if(Math.random()<0.3){
-        row.push("block"); c.classList.add("block");
-      } else row.push("empty");
-
-      game.appendChild(c);
-    }
-    grid.push(row);
-  }
-  game.appendChild(playerSprite);
+setTimeout(()=>{
+for(let y=0;y<rows;y++){
+for(let x=0;x<cols;x++){
+if(grid[y][x]==="explosion")grid[y][x]="empty";
 }
+}
+draw();
+},400);
+}
+
+/* 👾 ENEMY */
+function spawnEnemies(n=3){
+enemies=[];
+document.querySelectorAll(".enemySprite").forEach(e=>e.remove());
+
+for(let i=0;i<n;i++){
+let x=10+Math.floor(Math.random()*4);
+let y=8+Math.floor(Math.random()*4);
+
+let el=document.createElement("div");
+el.className="enemySprite";
+el.style.backgroundImage=`url(monst/mushroom.png)`;
+
+game.appendChild(el);
+enemies.push({x,y,el});
+}
+}
+
+setInterval(()=>{
+enemies.forEach(e=>{
+let dirs=[[1,0],[-1,0],[0,1],[0,-1]];
+let r=dirs[Math.floor(Math.random()*4)];
+let nx=e.x+r[0],ny=e.y+r[1];
+
+if(grid[ny]?.[nx]==="empty"){
+e.x=nx;e.y=ny;
+}
+
+e.el.style.transform=`translate(${e.x*step}px,${e.y*step}px)`;
+
+/* hit player */
+if(Math.round(player.x)===e.x && Math.round(player.y)===e.y){
+damage();
+}
+});
+},500);
 
 /* DRAW */
 function draw(){
-  document.querySelectorAll(".cell").forEach((c,i)=>{
-    c.className="cell";
-    let x=i%cols,y=Math.floor(i/cols),g=grid[y][x];
-
-    if(g==="wall") c.classList.add("wall");
-    if(g==="block") c.classList.add("block");
-    if(g==="bomb") c.classList.add("bomb");
-    if(g==="explosion") c.classList.add("explosion");
-    if(g==="power") c.classList.add("power");
-    if(g==="heart") c.classList.add("heart");
-  });
-
-  updateEnemies();
+document.querySelectorAll(".cell").forEach((c,i)=>{
+c.className="cell";
+let x=i%cols,y=Math.floor(i/cols),g=grid[y][x];
+if(g==="wall")c.classList.add("wall");
+if(g==="block")c.classList.add("block");
+if(g==="bomb")c.classList.add("bomb");
+if(g==="explosion")c.classList.add("explosion");
+if(g==="heart")c.classList.add("heart");
+});
 }
 
 /* START */
