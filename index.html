@@ -4,30 +4,42 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 
-<title>Bomberman PRO+</title>
+<title>Bomberman Mobile Pro</title>
 
 <style>
+:root{
+  --ui: rgba(255,255,255,0.15);
+  --glass: rgba(255,255,255,0.08);
+}
+
 html,body{
 margin:0;
 padding:0;
-background:#111;
+width:100%;
+height:100%;
 overflow:hidden;
-touch-action:none;
+background:#0b0f1a;
+font-family:sans-serif;
 }
 
-#game{
+/* 🎮 GAME CENTER */
+#gameWrap{
 position:absolute;
 top:50%;
 left:50%;
-transform:translate(-50%,-50%) scale(0.8);
+transform:translate(-50%,-50%);
+}
+
+#game{
 display:grid;
 grid-template-columns:repeat(15,40px);
 grid-template-rows:repeat(13,40px);
 gap:2px;
 }
 
-.cell{width:40px;height:40px;background:#333;}
-.wall{background:#777;}
+/* TILE */
+.cell{width:40px;height:40px;background:#1e293b;}
+.wall{background:#475569;}
 .block{background:url('monst/block.png');background-size:cover;}
 
 .bomb{
@@ -37,26 +49,22 @@ animation:blink .5s infinite;
 }
 
 @keyframes blink{
-0%{transform:scale(1)}
 50%{transform:scale(1.2)}
-100%{transform:scale(1)}
 }
 
-/* 💥 explosion sprite */
+/* 💥 EXPLOSION */
 .explosion{
 background:url('monst/explode.png');
 background-size:160px 40px;
-animation:explodeAnim .4s steps(4) forwards;
+animation:exp .4s steps(4) forwards;
 }
-
-@keyframes explodeAnim{
-from{background-position:0px}
+@keyframes exp{
 to{background-position:-160px}
 }
 
 .heart{background:url('monst/heart.png');background-size:cover;}
 
-.enemySprite{
+.enemy{
 width:40px;height:40px;
 position:absolute;
 background-size:cover;
@@ -71,88 +79,147 @@ position:absolute;
 z-index:10;
 }
 
-/* joystick */
-#joy{position:fixed;left:30px;bottom:30px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,.08);}
-#stick{width:60px;height:60px;border-radius:50%;background:rgba(255,255,255,.25);position:absolute;left:30px;top:30px;}
-
-#bombBtn{
-position:fixed;right:30px;bottom:30px;
-width:70px;height:70px;border-radius:50%;
-background:rgba(255,255,255,.2);
-display:flex;justify-content:center;align-items:center;font-size:28px;
+/* 🧊 HUD */
+#hud{
+position:fixed;
+top:10px;
+left:50%;
+transform:translateX(-50%);
+background:var(--glass);
+padding:8px 16px;
+border-radius:20px;
+backdrop-filter: blur(10px);
+font-size:14px;
 }
+
+/* 🎮 JOYSTICK */
+#joy{
+position:fixed;
+left:5vw;
+bottom:5vh;
+width:20vw;height:20vw;
+max-width:140px;max-height:140px;
+border-radius:50%;
+background:var(--glass);
+backdrop-filter:blur(8px);
+}
+#stick{
+width:50%;height:50%;
+border-radius:50%;
+background:var(--ui);
+position:absolute;
+left:25%;top:25%;
+}
+
+/* 💣 BUTTON */
+#bombBtn{
+position:fixed;
+right:5vw;
+bottom:5vh;
+width:18vw;height:18vw;
+max-width:90px;max-height:90px;
+border-radius:50%;
+background:var(--ui);
+display:flex;
+justify-content:center;
+align-items:center;
+font-size:6vw;
+backdrop-filter:blur(10px);
+}
+
+/* ⛶ FULLSCREEN */
+#fullBtn{
+position:fixed;
+top:10px;
+right:10px;
+width:45px;height:45px;
+border-radius:10px;
+background:var(--ui);
+display:flex;
+justify-content:center;
+align-items:center;
+}
+
 </style>
 </head>
 
 <body>
 
-<div id="game"><div id="player"></div></div>
+<div id="hud">❤️ 3 | 💣 1</div>
+
+<div id="gameWrap">
+  <div id="game">
+    <div id="player"></div>
+  </div>
+</div>
+
 <div id="joy"><div id="stick"></div></div>
 <div id="bombBtn">💣</div>
+<div id="fullBtn">⛶</div>
 
 <script>
 const rows=13,cols=15,step=42;
-let grid=[],bombs=[],enemies=[];
-let player={x:1,y:1,hp:3,alive:true};
+let grid=[],enemies=[],bombs=[];
+let player={x:1,y:1,hp:3,range:1};
 
 const game=document.getElementById("game");
-const pEl=document.getElementById("player");
+const wrap=document.getElementById("gameWrap");
+const p=document.getElementById("player");
+const hud=document.getElementById("hud");
 
-/* ===== MAP ===== */
-function createMap(){
+/* 📐 AUTO SCALE */
+function scaleGame(){
+let w=window.innerWidth;
+let h=window.innerHeight;
+
+let baseW=cols*42;
+let baseH=rows*42;
+
+let s=Math.min(w/baseW,h/baseH);
+s=Math.max(0.6,Math.min(s,1.2));
+
+wrap.style.transform=`translate(-50%,-50%) scale(${s})`;
+}
+window.addEventListener("resize",scaleGame);
+
+/* MAP */
+function map(){
 grid=[];game.innerHTML="";
 for(let y=0;y<rows;y++){
-let row=[];
+let r=[];
 for(let x=0;x<cols;x++){
 let c=document.createElement("div");
 c.className="cell";
 
-if(y===0||x===0||y===rows-1||x===cols-1||(x%2===0&&y%2===0)){
-row.push("wall");c.classList.add("wall");
+if(y===0||x===0||y===rows-1||x===cols-1||(x%2==0&&y%2==0)){
+r.push("wall");c.classList.add("wall");
 }else if(Math.random()<0.3){
-row.push("block");c.classList.add("block");
-}else row.push("empty");
+r.push("block");c.classList.add("block");
+}else r.push("empty");
 
 game.appendChild(c);
 }
-grid.push(row);
+grid.push(r);
 }
-game.appendChild(pEl);
-}
-
-/* ===== PLAYER ===== */
-function updatePlayer(){
-pEl.style.transform=`translate(${player.x*step}px,${player.y*step}px)`;
+game.appendChild(p);
 }
 
-/* ❤️ DAMAGE / RESPAWN */
-function damage(){
-if(!player.alive) return;
+/* PLAYER */
+function drawPlayer(){
+p.style.transform=`translate(${player.x*step}px,${player.y*step}px)`;
+}
+
+/* ❤️ DAMAGE */
+function hit(){
 player.hp--;
-
-if(player.hp<=0){
-player.alive=false;
-alert("Game Over");
-location.reload();
-return;
+hud.innerHTML=`❤️ ${player.hp} | 💣 ${player.range}`;
+if(player.hp<=0){alert("Game Over");location.reload();}
 }
 
-player.alive=false;
-pEl.style.opacity=0.3;
-
-setTimeout(()=>{
-player.x=1;player.y=1;
-player.alive=true;
-pEl.style.opacity=1;
-updatePlayer();
-},1500);
-}
-
-/* ===== ANALOG MOVE ===== */
+/* 🎮 ANALOG */
 let vx=0,vy=0;
 
 function loop(){
-if(player.alive){
 let nx=player.x+vx;
 let ny=player.y+vy;
 
@@ -160,16 +227,15 @@ let gx=Math.round(nx);
 let gy=Math.round(ny);
 
 if(grid[gy]?.[gx]!=="wall" && grid[gy]?.[gx]!=="block"){
-player.x=nx;
-player.y=ny;
+player.x=nx;player.y=ny;
 }
-updatePlayer();
-}
+
+drawPlayer();
 requestAnimationFrame(loop);
 }
 loop();
 
-/* 🎮 JOY */
+/* JOY */
 let joy=document.getElementById("joy");
 let stick=document.getElementById("stick");
 
@@ -184,15 +250,10 @@ let dy=t.clientY-cy;
 
 let dist=Math.sqrt(dx*dx+dy*dy);
 let max=40;
-
-if(dist>max){
-dx=dx/dist*max;
-dy=dy/dist*max;
-}
+if(dist>max){dx=dx/dist*max;dy=dy/dist*max;}
 
 stick.style.transform=`translate(${dx}px,${dy}px)`;
 
-/* normalize */
 vx=dx/80;
 vy=dy/80;
 });
@@ -209,98 +270,43 @@ let y=Math.round(player.y);
 
 if(grid[y][x]!=="empty")return;
 
-let b={x,y};
-bombs.push(b);
 grid[y][x]="bomb";
 draw();
 
-setTimeout(()=>explode(b),1200);
-};
-
-function explode(b){
+setTimeout(()=>{
 [[0,0],[1,0],[-1,0],[0,1],[0,-1]].forEach(([dx,dy])=>{
 for(let i=0;i<2;i++){
-let nx=b.x+dx*i,ny=b.y+dy*i;
+let nx=x+dx*i,ny=y+dy*i;
+if(grid[ny][nx]=="wall")break;
 
-if(grid[ny][nx]==="wall")break;
-
-if(grid[ny][nx]==="block"){
+if(grid[ny][nx]=="block"){
 grid[ny][nx]=Math.random()<0.2?"heart":"empty";
 break;
 }
 
 grid[ny][nx]="explosion";
 
-/* hit player */
-if(Math.round(player.x)===nx && Math.round(player.y)===ny){
-damage();
-}
-
-/* hit enemy */
-enemies=enemies.filter(e=>{
-if(e.x===nx&&e.y===ny){
-e.el.remove();
-return false;
-}
-return true;
-});
+if(Math.round(player.x)==nx&&Math.round(player.y)==ny)hit();
 }
 });
-
 draw();
 
 setTimeout(()=>{
-for(let y=0;y<rows;y++){
-for(let x=0;x<cols;x++){
-if(grid[y][x]==="explosion")grid[y][x]="empty";
-}
-}
+for(let y=0;y<rows;y++)
+for(let x=0;x<cols;x++)
+if(grid[y][x]=="explosion")grid[y][x]="empty";
 draw();
 },400);
-}
 
-/* 👾 ENEMY */
-function spawnEnemies(n=3){
-enemies=[];
-document.querySelectorAll(".enemySprite").forEach(e=>e.remove());
-
-for(let i=0;i<n;i++){
-let x=10+Math.floor(Math.random()*4);
-let y=8+Math.floor(Math.random()*4);
-
-let el=document.createElement("div");
-el.className="enemySprite";
-el.style.backgroundImage=`url(monst/mushroom.png)`;
-
-game.appendChild(el);
-enemies.push({x,y,el});
-}
-}
-
-setInterval(()=>{
-enemies.forEach(e=>{
-let dirs=[[1,0],[-1,0],[0,1],[0,-1]];
-let r=dirs[Math.floor(Math.random()*4)];
-let nx=e.x+r[0],ny=e.y+r[1];
-
-if(grid[ny]?.[nx]==="empty"){
-e.x=nx;e.y=ny;
-}
-
-e.el.style.transform=`translate(${e.x*step}px,${e.y*step}px)`;
-
-/* hit player */
-if(Math.round(player.x)===e.x && Math.round(player.y)===e.y){
-damage();
-}
-});
-},500);
+},1200);
+};
 
 /* DRAW */
 function draw(){
 document.querySelectorAll(".cell").forEach((c,i)=>{
 c.className="cell";
 let x=i%cols,y=Math.floor(i/cols),g=grid[y][x];
+
 if(g==="wall")c.classList.add("wall");
 if(g==="block")c.classList.add("block");
 if(g==="bomb")c.classList.add("bomb");
@@ -310,10 +316,10 @@ if(g==="heart")c.classList.add("heart");
 }
 
 /* START */
-createMap();
-spawnEnemies(3);
-updatePlayer();
+map();
+drawPlayer();
 draw();
+scaleGame();
 </script>
 
 </body>
