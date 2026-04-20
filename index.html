@@ -157,9 +157,15 @@ const speed = 0.05;
 
 /* SCALE */
 function scale(){
-let s=Math.min(window.innerWidth/(cols*step),window.innerHeight/(rows*step));
-s=Math.max(0.7,Math.min(s,1));
-wrap.style.transform=`translate(-50%,-50%) scale(${s})`;
+  let s = Math.min(
+    window.innerWidth / (cols * step),
+    window.innerHeight / (rows * step)
+  );
+
+  s = Math.max(0.7, Math.min(s, 1));
+
+  // ✅ ต้องมี translate + scale พร้อมกัน
+  wrap.style.transform = `translate(-50%, -50%) scale(${s})`;
 }
 window.addEventListener("resize",scale);
 
