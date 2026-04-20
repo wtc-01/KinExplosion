@@ -120,7 +120,7 @@ font-size:6vw;
 
 <body>
 
-<div id="hud">❤️ 3 | 💣 1</div>
+<div id="hud"><font color="white">❤️ 3 | 💣 1</font></div>
 
 <div id="wrap">
   <div id="game">
@@ -194,22 +194,39 @@ location.reload();
 
 /* 🎮 ANALOG (ลดความเร็ว) */
 let vx=0,vy=0;
-const speed=0.05; // 🔥 ลดความเร็วตรงนี้
+const speed=0.03; // 🔥 ลดความเร็วตรงนี้
+
+const margin = 0.2; // 🔥 กันติดมุม
 
 function loop(){
-let nx=player.x+vx*speed;
-let ny=player.y+vy*speed;
 
-let gx=Math.floor(nx+0.5);
-let gy=Math.floor(ny+0.5);
+  // ===== X =====
+  let nx = player.x + vx * speed;
+  let ny = player.y;
 
-if(grid[gy]?.[gx]!=="wall" && grid[gy]?.[gx]!=="block"){
-player.x=nx;
-player.y=ny;
-}
+  let gx = Math.floor(nx + (vx > 0 ? margin : -margin));
+  let gy = Math.floor(player.y + 0.5);
 
-drawPlayer();
-requestAnimationFrame(loop);
+  if(grid[gy]?.[gx] !== "wall" && grid[gy]?.[gx] !== "block"){
+    player.x = nx;
+  } else {
+    vx = 0;
+  }
+
+  // ===== Y =====
+  ny = player.y + vy * speed;
+
+  gx = Math.floor(player.x + 0.5);
+  gy = Math.floor(ny + (vy > 0 ? margin : -margin));
+
+  if(grid[gy]?.[gx] !== "wall" && grid[gy]?.[gx] !== "block"){
+    player.y = ny;
+  } else {
+    vy = 0;
+  }
+
+  drawPlayer();
+  requestAnimationFrame(loop);
 }
 loop();
 
